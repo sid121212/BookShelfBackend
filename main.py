@@ -8,6 +8,7 @@ import os
 from pydantic import BaseModel
 import base64
 import uvicorn
+import json
 
 load_dotenv()
 MONGO_DB_PASS=os.getenv("MONGO_DB_PASS")
@@ -18,7 +19,7 @@ db=client.bliss_bucket
 
 collection_user = db["users"]
 collection_book = db["books"]
-
+collection_cart = db["cart"]
 
 
 app = FastAPI()
@@ -35,6 +36,7 @@ class User(BaseModel):
     password: str
 
 class Book(BaseModel):
+    user_id: str
     title: str
     img: str
     ratings: int
@@ -43,6 +45,10 @@ class Book(BaseModel):
     lat: int
     long: int
     price: int
+
+class Cart(BaseModel):
+    user_id: str
+    object_id: str
 
 
 @app.get("/")
@@ -91,6 +97,7 @@ async def login(user: User):
 async def create_book(book: Book):
     try:
         book_db = {
+            "user_id": book.user_id,
             "title": book.title,
             "img": book.img,
             "ratings": book.ratings,
@@ -110,13 +117,83 @@ async def create_book(book: Book):
 async def getAllBooks():
     try:
         books = list(collection_book.find())
-    
+
         for book in books:
             book['_id'] = str(book['_id'])
 
         return {"books": books}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting all books: {str(e)}")
+
+@app.delete("/deleteBook")
+async def delete_book():
+    try:
+        collection_book.delete_one({"title": 'Hdjdj'})
+        return {"message": f"Book with title 'Hdjdj' deleted successfully"}
+       
+    except Exception as e:
+        # Handle any errors that occur during the deletion process
+        raise HTTPException(status_code=500, detail=f"Error deleting book: {str(e)}")
+    
+
+
+@app.post("/addCart")
+async def add_cart(cart: Cart):
+    try:
+        collection_cart.insert_one({"user_id": cart.user_id, "object_id": cart.object_id})
+        return {"message": f"Item {cart.object_id} added successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error inserting element: {str(e)}")
+    
+
+@app.get("/getCart/{user_id}")
+async def get_cart(user_id: str):
+    try:
+        cart_items = collection_cart.find({"user_id": user_id})
+        cart_list = []
+        temp = []
+        for item in cart_items:
+            cart_book = collection_book.find_one({"_id": ObjectId(item["object_id"])})
+            cart_book["_id"] = str(cart_book["_id"])
+                # Convert the MongoDB document to JSON
+            cart_book_json = json.dumps(cart_book)
+            cart_list.append(cart_book_json)
+        return {"cart": cart_list}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving cart items: {str(e)}")
+    
+@app.delete("/deleteCart")
+async def delete_cart(user_id: str, object_id: str):
+    try:
+        result = collection_cart.delete_one({"user_id": user_id, "object_id": object_id})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail=f"No item found for user {user_id} with object ID {object_id}")
+        return {"message": f"Successfully deleted the item from the cart for user {user_id} with object ID {object_id}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting cart item: {str(e)}")
+    
+
+@app.get("/checkCartItemInCart")
+async def check_cart_item_in_cart(user_id: str, object_id: str):
+    try:
+        cart_item = collection_cart.find_one({"user_id": user_id, "object_id": object_id})
+        if cart_item:
+            return {"inCart": True}
+        else:
+            return {"inCart": False}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error checking item in cart: {str(e)}")
+
+@app.delete("/emptyCart")
+async def emptyCart(user_id: str):
+    try:
+        delete_result = collection_cart.delete_many({"user_id": user_id})
+        if delete_result.deleted_count > 0:
+            return {"message": f"{delete_result.deleted_count} items deleted successfully for user_id: {user_id}"}
+        else:
+            return {"message": f"No items found for user_id: {user_id}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting items: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
