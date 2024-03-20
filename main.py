@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from bson import ObjectId
-from fastapi import FastAPI,HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo.mongo_client import MongoClient
 from dotenv import load_dotenv
@@ -9,6 +9,7 @@ from pydantic import BaseModel
 import base64
 import uvicorn
 import json
+
 
 load_dotenv()
 MONGO_DB_PASS=os.getenv("MONGO_DB_PASS")
@@ -20,6 +21,7 @@ db=client.bliss_bucket
 collection_user = db["users"]
 collection_book = db["books"]
 collection_cart = db["cart"]
+collection_profile = db["profile_image"]
 
 
 app = FastAPI()
@@ -30,6 +32,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
 
 class User(BaseModel):
     username: str
@@ -50,6 +54,9 @@ class Cart(BaseModel):
     user_id: str
     object_id: str
 
+class ProfileImage(BaseModel):
+    user_id: str
+    img_url: str
 
 @app.get("/")
 def health_check():
@@ -194,6 +201,27 @@ async def emptyCart(user_id: str):
             return {"message": f"No items found for user_id: {user_id}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting items: {str(e)}")
+
+
+@app.post("/profileImage")
+async def profileImage(profileImg: ProfileImage):
+    try:
+        img = collection_profile.insert_one({"user_id": profileImg.user_id,"img_url": profileImg.img_url})
+        return {"message": "Image was successfully uploaded"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error inserting profile image: {str(e)}")
+
+
+@app.get("/profileImage/{user_id}")
+async def get_profile_image(user_id: str):
+    try:
+        profile_img = collection_profile.find_one({"user_id": user_id})
+        if profile_img:
+            return {"img_url": profile_img.get("img_url")}
+        else:
+            raise HTTPException(status_code=404, detail="Profile image not found for the user")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching profile image: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
