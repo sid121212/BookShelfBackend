@@ -180,6 +180,23 @@ async def get_cart(user_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving cart items: {str(e)}")
     
+@app.get("/getCartSummary/{user_id}")
+async def get_cart_summary(user_id: str):
+    try:
+        cart_items = collection_cart.find({"user_id": user_id})
+        total_items = 0
+        total_price = 0.0
+        for item in cart_items:
+            cart_book = collection_book.find_one({"_id": ObjectId(item["object_id"])})
+            cart_book["_id"] = str(cart_book["_id"])
+            cart_book_json = json.dumps(cart_book)
+            # print(cart_book_json)
+            total_items+=1
+            total_price+=cart_book["price"]
+        return {"total_items": total_items,"total_price": total_price}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving cart items: {str(e)}")
+    
 @app.delete("/deleteCart")
 async def delete_cart(user_id: str, object_id: str):
     try:
@@ -251,6 +268,8 @@ async def get_orders(user_id: str):
         return {'orders': orders}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting orders: {str(e)}")
+
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
