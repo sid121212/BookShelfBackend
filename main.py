@@ -143,6 +143,18 @@ async def getAllBooks():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting all books: {str(e)}")
 
+@app.get("/userBooks/{user_id}")
+async def userBooks(user_id: str):
+    try:
+        books = list(collection_book.find({"user_id": user_id}))
+        for book in books:
+            book['_id'] = str(book['_id'])
+
+        return {"books": books}
+
+    except Exception as e:
+        return HTTPException(status_code=500, detail=f"Error getting books: {str(e)}")
+
 @app.delete("/deleteBook")
 async def delete_book():
     try:
