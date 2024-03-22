@@ -22,6 +22,7 @@ collection_user = db["users"]
 collection_book = db["books"]
 collection_cart = db["cart"]
 collection_profile = db["profile_image"]
+collection_orders = db["orders"]
 
 
 app = FastAPI()
@@ -57,6 +58,16 @@ class Cart(BaseModel):
 class ProfileImage(BaseModel):
     user_id: str
     img_url: str
+
+
+class Orders(BaseModel):
+    user_id: str
+    date_created: str
+    time_created: str
+    status: bool
+
+
+
 
 @app.get("/")
 def health_check():
@@ -222,6 +233,24 @@ async def get_profile_image(user_id: str):
             raise HTTPException(status_code=404, detail="Profile image not found for the user")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching profile image: {str(e)}")
+
+@app.post("/create_order")
+async def create_order(orders: Orders):
+    try:
+        collection_orders.insert_one({"user_id": orders.user_id,"date_created": orders.date_created,"time_created": orders.time_created,"status": orders.status})
+        return {"message": "Order object was created successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating order: {str(e)}")
+    
+@app.get("/getOrders/{user_id}")
+async def get_orders(user_id: str):
+    try:
+        orders = list(collection_orders.find({"user_id": user_id}))
+        for child in orders:
+            child['_id']=str(child['_id'])
+        return {'orders': orders}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting orders: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
