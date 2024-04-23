@@ -281,7 +281,13 @@ async def get_orders(user_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting orders: {str(e)}")
 
-
+@app.delete("/userBooks/{book_id}")
+async def userBooks(book_id: str):
+    try:
+        deleted_book = collection_book.delete_one({"_id": ObjectId(book_id)})
+        return {"Book has been successfully deleted": str(deleted_book)}
+    except Exception as e:
+        return HTTPException(status_code=500, detail=f"Error deleting book: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
